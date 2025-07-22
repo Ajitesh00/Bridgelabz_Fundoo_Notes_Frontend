@@ -4,20 +4,27 @@ import React, { useState, useEffect } from 'react';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
+import { useRouter } from 'next/navigation';
+import { register } from '../services/user.service';
 import './signup.css';
 
+// Define form state structure
 type State = {
   firstName: string;
   lastName: string;
   email: string;
   password: string;
   confirmPassword: string;
-  passwordError: boolean;
-  showPassword: boolean;
+  passwordError: boolean; // Track password validation errors
+  showPassword: boolean;  // Toggle password visibility
 };
 
+// FUNCTIONAL COMPONENT - Google-style signup form with responsive design
 export default function SignupForm() {
-  const [state, setState] = useState<State>({
+  // Main form state
+  const [formData, setFormData] = useState<State>({
     firstName: '',
     lastName: '',
     email: '',
@@ -26,215 +33,229 @@ export default function SignupForm() {
     passwordError: false,
     showPassword: false,
   });
+  
+  // Track screen size for responsive layout
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Notification state for success/error messages
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+  
+  const router = useRouter();
 
+  // Set up responsive layout detection
   useEffect(() => {
     const handleResize = () => {
-      setIsMobile(window.innerWidth <= 480);
+      setIsMobile(window.innerWidth <= 480); // Mobile breakpoint
     };
-    // Delay initial check to ensure window is available
+    
+    // Initial check with delay to ensure window is loaded
     const timer = setTimeout(() => {
       handleResize();
     }, 0);
+    
+    // Listen for window resize events
     window.addEventListener('resize', handleResize);
+    
+    // Cleanup on component unmount
     return () => {
       clearTimeout(timer);
       window.removeEventListener('resize', handleResize);
     };
   }, []);
 
+  // Handle input field changes (firstName, lastName, email, password, confirmPassword)
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setState(prevState => ({
+    setFormData(prevState => ({
       ...prevState,
-      [name]: value,
+      [name]: value, // Dynamically update field based on input name
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const { password, confirmPassword } = state;
-    if (password.length < 8 || password !== confirmPassword) {
-      setState(prevState => ({ ...prevState, passwordError: true }));
+  // Handle form submission and registration
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent default form submission
+    const { password, confirmPassword, firstName, lastName, email } = formData;
+    
+    // If password is filled, validate that required fields are also filled
+    if (password && (!firstName.trim() || !lastName.trim() || !email.trim())) {
+      const missingFields = [];
+      if (!firstName.trim()) missingFields.push('First name');
+      if (!lastName.trim()) missingFields.push('Last name');
+      if (!email.trim()) missingFields.push('Username');
+      
+      setSnackbar({
+        open: true,
+        message: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+        severity: 'error',
+      });
       return;
     }
-    setState(prevState => ({ ...prevState, passwordError: false }));
-    console.log(state);
+    
+    // Validate password requirements
+    if (password.length < 8 || password !== confirmPassword) {
+      setFormData(prevState => ({ ...prevState, passwordError: true }));
+      setSnackbar({
+        open: true,
+        message: 'Passwords must match and be at least 8 characters',
+        severity: 'error',
+      });
+      return;
+    }
+    
+    // Reset password error if validation passes
+    setFormData(prevState => ({ ...prevState, passwordError: false }));
+
+    try {
+      // Call registration API
+      const response = await register({ firstName, lastName, email, password });
+      
+      if (response.data.code === 201) {
+        // Registration successful
+        setSnackbar({
+          open: true,
+          message: response.data.message,
+          severity: 'success',
+        });
+        // Redirect to signin page after 2 seconds
+        setTimeout(() => {
+          router.push('/signin');
+        }, 2000);
+      } else {
+        // Registration failed with error message
+        setSnackbar({
+          open: true,
+          message: response.data.message || 'Registration failed',
+          severity: 'error',
+        });
+      }
+    } catch (error) {
+      // Handle network errors or API failures
+      setSnackbar({
+        open: true,
+        message: 'Something went wrong during registration',
+        severity: 'error',
+      });
+    }
   };
 
+  // Toggle password visibility (only if password fields have content)
   const togglePasswordVisibility = () => {
-    const { password, confirmPassword } = state;
+    const { password, confirmPassword } = formData;
     if (password || confirmPassword) {
-      setState(prevState => ({
+      setFormData(prevState => ({
         ...prevState,
         showPassword: !prevState.showPassword,
       }));
     }
   };
 
-  if (isMobile) {
-    return (
-      
-      <form
-        onSubmit={handleSubmit}
-        className="p-4 bg-white rounded-md shadow-md max-w-xs mx-auto flex flex-col items-center"
-      >
-        <div className="w-full">
-          <img src="google.png" alt="Google Logo" className="w-16 mb-2" />
-          <h1 className="font-bold text-xl mb-4 whitespace-nowrap">Create your Google Account</h1>
-          <TextField
-            name="firstName"
-            label="First name"
-            variant="outlined"
-            value={state.firstName}
-            onChange={handleChange}
-            fullWidth
-            // className="mb-4" // Increased spacing
-            className="textfield"
-          />
-          <TextField
-            name="lastName"
-            label="Last name"
-            variant="outlined"
-            value={state.lastName}
-            onChange={handleChange}
-            fullWidth
-            className="textfield"
-          />
-          <TextField
-            name="email"
-            label="Username"
-            variant="outlined"
-            value={state.email}
-            onChange={handleChange}
-            fullWidth
-            InputProps={{
-              endAdornment: <span className="ml-2 text-gray-500">@gmail.com</span>,
-            }}
-            helperText="You can use letters, numbers & periods"
-            className="textfield"
-          />
-          <div className="flex justify-center gap-2 mb-4 mt-2 w-full">
-            <div className="flex items-center flex-1">
-              <TextField
-                name="password"
-                type={state.showPassword && (state.password || state.confirmPassword) ? 'text' : 'password'}
-                label="Password"
-                variant="outlined"
-                value={state.password}
-                onChange={handleChange}
-                fullWidth
-                className="flex-1"
-                error={state.passwordError}
-                helperText={state.passwordError ? "Use 8 or more characters with a mix of letters, numbers & symbols" : ""}
-              />
-            </div>
-            <div className="flex items-center flex-1">
-              <TextField
-                name="confirmPassword"
-                type={state.showPassword && (state.password || state.confirmPassword) ? 'text' : 'password'}
-                label="Confirm"
-                variant="outlined"
-                value={state.confirmPassword}
-                onChange={handleChange}
-                fullWidth
-                className="flex-1"
-                error={state.passwordError}
-                helperText={state.passwordError ? "Passwords must match and be at least 8 characters" : ""}
-              />
-            </div>
-            <div className="flex items-center">
-              <img
-                src="eye.svg"
-                alt="Toggle password visibility"
-                className="w-6 h-6 cursor-pointer"
-                onClick={togglePasswordVisibility}
-              />
-            </div>
-          </div>
-          <div className="flex justify-between items-center w-full">
-            <Link href="/signin" className="text-blue-600">
-              Sign in instead
-            </Link>
-            <Button type="submit" variant="contained" color="primary" className="w-16 h-8">
-              Next
-            </Button>
-          </div>
-        </div>
-      </form>
-    );
-  }
+  // Close notification snackbar
+  const handleSnackbarClose = () => {
+    setSnackbar(prev => ({ ...prev, open: false }));
+  };
 
+  // Responsive form with conditional rendering
   return (
+  <>
     <form
       onSubmit={handleSubmit}
-      className="p-12 bg-white rounded-md shadow-md max-w-3xl mx-auto flex flex-row gap-18"
+      className={`
+        bg-white rounded-md shadow-md mx-auto flex items-center
+        ${isMobile 
+          ? 'p-4 max-w-xs flex-col'  // Mobile: smaller padding, single column
+          : 'pl-12 pr-12 pt-8 pb-8 max-w-3xl flex-row gap-18' // Desktop: larger padding, two columns
+        }
+      `}
     >
-      <div className="flex-1">
-        <img src="google.png" alt="Google Logo" className="w-22 mb-2" />
-        <h1 className="font-bold text-3xl mb-6 whitespace-nowrap">Create your Google Account</h1>
-        <div className="flex gap-4 mb-8">
+      {/* Main form content */}
+      <div className={isMobile ? "w-full" : "flex-1"}>
+        {/* Header section with logo and title */}
+        <img 
+          src="google.png" 
+          alt="Google Logo" 
+          className={isMobile ? "w-16 mb-2" : "w-22 mb-2"} 
+        />
+        <h1 className={`font-bold mb-4 whitespace-nowrap ${
+          isMobile ? "text-xl mb-4" : "text-3xl mb-6"
+        }`}>
+          Create your Google Account
+        </h1>
+
+        {/* Name fields - responsive layout */}
+        <div className={`${isMobile ? "" : "flex gap-4 mb-8"}`}>
           <TextField
             name="firstName"
             label="First name"
             variant="outlined"
-            value={state.firstName}
+            value={formData.firstName}
             onChange={handleChange}
             fullWidth
-            className="flex-1"
+            className={`${isMobile ? "textfield" : "flex-1"}`}
           />
           <TextField
             name="lastName"
             label="Last name"
             variant="outlined"
-            value={state.lastName}
+            value={formData.lastName}
             onChange={handleChange}
             fullWidth
-            className="flex-1"
+            className={`${isMobile ? "textfield" : "flex-1"}`}
           />
         </div>
+
+        {/* Email/Username field with @gmail.com suffix */}
         <TextField
           name="email"
           label="Username"
           variant="outlined"
-          value={state.email}
+          value={formData.email}
           onChange={handleChange}
           fullWidth
           InputProps={{
             endAdornment: <span className="ml-2 text-gray-500">@gmail.com</span>,
           }}
           helperText="You can use letters, numbers & periods"
-          className="mb-4"
+          className={isMobile ? "textfield" : "mb-4"}
         />
-        <div className="flex justify-center gap-4 mb-4 mt-4">
+
+        {/* Password fields with visibility toggle */}
+        <div className={`flex justify-center gap-${isMobile ? '2' : '4'} mb-4 ${
+          isMobile ? 'mt-2' : 'mt-4'
+        } w-full`}>
           <div className="flex items-center flex-1">
             <TextField
               name="password"
-              type={state.showPassword && (state.password || state.confirmPassword) ? 'text' : 'password'}
+              type={formData.showPassword && (formData.password || formData.confirmPassword) ? 'text' : 'password'}
               label="Password"
               variant="outlined"
-              value={state.password}
+              value={formData.password}
               onChange={handleChange}
               fullWidth
               className="flex-1"
-              error={state.passwordError}
-              helperText={state.passwordError ? "Use 8 or more characters with a mix of letters, numbers & symbols" : ""}
+              error={formData.passwordError}
+              helperText={formData.passwordError ? "Use 8 or more characters with a mix of letters, numbers & symbols" : ""}
             />
           </div>
           <div className="flex items-center flex-1">
             <TextField
               name="confirmPassword"
-              type={state.showPassword && (state.password || state.confirmPassword) ? 'text' : 'password'}
+              type={formData.showPassword && (formData.password || formData.confirmPassword) ? 'text' : 'password'}
               label="Confirm"
               variant="outlined"
-              value={state.confirmPassword}
+              value={formData.confirmPassword}
               onChange={handleChange}
               fullWidth
               className="flex-1"
-              error={state.passwordError}
-              helperText={state.passwordError ? "Passwords must match and be at least 8 characters" : ""}
+              error={formData.passwordError}
+              helperText={formData.passwordError ? "Passwords must match and be at least 8 characters" : ""}
             />
           </div>
+          {/* Eye icon for password visibility toggle */}
           <div className="flex items-center">
             <img
               src="eye.svg"
@@ -244,19 +265,43 @@ export default function SignupForm() {
             />
           </div>
         </div>
-        <div className="flex justify-between items-center">
+
+        {/* Footer with navigation and submit button */}
+        <div className="flex justify-between items-center w-full">
           <Link href="/signin" className="text-blue-600">
             Sign in instead
           </Link>
-          <Button type="submit" variant="contained" color="primary" className="w-20 h-10">
+          <Button 
+            type="submit" 
+            variant="contained" 
+            color="primary" 
+            className={isMobile ? "w-16 h-8" : "w-20 h-10"}
+          >
             Next
           </Button>
         </div>
       </div>
-      <div className="flex-1 flex flex-col justify-center items-center">
-        <img src="new.png" alt="Google Services" className="w-48 h-52 mb-4" />
-        <p className="text-center text-gray-600">One account. All of Google working for you.</p>
-      </div>
+
+      {/* Side illustration - only show on desktop */}
+      {!isMobile && (
+        <div className="flex-1 flex flex-col justify-center items-center">
+          <img src="new.png" alt="Google Services" className="w-48 h-52 mb-4" />
+          <p className="text-center text-gray-600">One account. All of Google working for you.</p>
+        </div>
+      )}
     </form>
-  );
+
+    {/* Notification snackbar for success/error messages */}
+    <Snackbar
+      open={snackbar.open}
+      autoHideDuration={6000} // Auto-hide after 6 seconds
+      onClose={handleSnackbarClose}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    >
+      <Alert onClose={handleSnackbarClose} severity={snackbar.severity} sx={{ width: '100%' }}>
+        {snackbar.message}
+      </Alert>
+    </Snackbar>
+  </>
+);
 }
