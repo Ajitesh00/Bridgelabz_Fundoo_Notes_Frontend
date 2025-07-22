@@ -71,12 +71,8 @@ export default function Dashboard() {
     fetchNotes();
   }, []);
 
-  const handleDrawerOpen = () => {
-    setOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setOpen(false);
+  const handleDrawerToggle = () => {
+    setOpen(!open);
   };
 
   const handleViewChange = (view: 'notes' | 'archive' | 'trash') => {
@@ -180,11 +176,10 @@ export default function Dashboard() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
-      <PrimarySearchAppBar open={open} handleDrawerOpen={handleDrawerOpen} />
+      <PrimarySearchAppBar open={open} onDrawerToggle={handleDrawerToggle} />
       <MiniDrawer
         open={open}
-        handleDrawerOpen={handleDrawerOpen}
-        handleDrawerClose={handleDrawerClose}
+        onDrawerToggle={handleDrawerToggle}
         onViewChange={handleViewChange}
         currentView={currentView}
       />
@@ -196,7 +191,7 @@ export default function Dashboard() {
             width: '100%',
             marginLeft: '-100px',
             marginBottom: '-40px',
-            paddingLeft: open ? '256px' : '80px',
+            paddingLeft: open ? `${drawerWidth}px` : '80px',
           }}
         >
           <Box sx={{ mb: 6, display: 'flex', justifyContent: 'center' }}>
@@ -225,7 +220,7 @@ export default function Dashboard() {
             maxWidth: '1100px',
             minWidth: '1048px',
             marginLeft: '-50px',
-            paddingLeft: open ? '256px' : '80px',
+            paddingLeft: open ? `${drawerWidth}px` : '80px',
             overflow: 'hidden',
           }}
         >

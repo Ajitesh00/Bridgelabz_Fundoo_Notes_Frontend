@@ -1,5 +1,3 @@
-// NotesContainer.tsx
-
 'use client';
 
 import React, { useState } from 'react';
@@ -354,20 +352,6 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
   const pinnedNotes = filteredNotes.filter(note => note.isPinned);
   const regularNotes = filteredNotes.filter(note => !note.isPinned);
 
-  if (editingNote) {
-    return (
-      <Box className={className}>
-        <TakeNotes
-          onSaveNote={handleSaveEditedNote}
-          onClose={handleCloseEdit} // Ensure this only closes
-          onArchive={() => onArchiveNote?.(editingNote.id)}
-          onTrash={() => onTrashNote?.(editingNote.id)}
-          initialNote={editingNote}
-        />
-      </Box>
-    );
-  }
-
   return (
     <Box
       className={className}
@@ -376,8 +360,45 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
         paddingLeft: '16px',
         width: '100%',
         maxWidth: '1600px',
+        position: 'relative',
       }}
     >
+      {/* Edit note overlay */}
+      {editingNote && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.2)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000,
+            marginLeft: '82px',
+          }}
+        >
+          <Box
+            sx={{
+              width: '100%',
+              maxWidth: '600px',
+              margin: '0 auto',
+              padding: '16px',
+            }}
+          >
+            <TakeNotes
+              onSaveNote={handleSaveEditedNote}
+              onClose={handleCloseEdit}
+              onArchive={() => onArchiveNote?.(editingNote.id)}
+              onTrash={() => onTrashNote?.(editingNote.id)}
+              initialNote={editingNote}
+            />
+          </Box>
+        </Box>
+      )}
+
       {/* Pinned notes section */}
       {pinnedNotes.length > 0 && (
         <Box sx={{ mb: 4 }}>

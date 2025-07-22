@@ -80,28 +80,21 @@ interface AppBarProps extends MuiAppBarProps {
 
 const StyledAppBar = styled(AppBar, {
   shouldForwardProp: (prop) => prop !== 'open',
-})<AppBarProps>(({ theme, open }) => ({
-  zIndex: theme.zIndex.drawer + 1,
-  transition: theme.transitions.create(['width', 'margin'], {
-    easing: theme.transitions.easing.sharp,
-    duration: theme.transitions.duration.leavingScreen,
-  }),
-  ...(open && {
-    marginLeft: drawerWidth,
-    width: `calc(100% - ${drawerWidth}px)`,
-    transition: theme.transitions.create(['width', 'margin'], {
-      easing: theme.transitions.easing.sharp,
-      duration: theme.transitions.duration.enteringScreen,
-    }),
-  }),
+})<AppBarProps>(({ theme }) => ({
+  zIndex: theme.zIndex.drawer + 2,
+  position: 'fixed',
+  width: '100%',
+  backgroundColor: '#ffffff',
+  boxShadow: 'none',
+  borderBottom: '1px solid rgba(0, 0, 0, 0.12)', // Matching the default MUI Drawer border
 }));
 
 interface PrimarySearchAppBarProps {
   open: boolean;
-  handleDrawerOpen: () => void;
+  onDrawerToggle: () => void;
 }
 
-export default function PrimarySearchAppBar({ open, handleDrawerOpen }: PrimarySearchAppBarProps) {
+export default function PrimarySearchAppBar({ open, onDrawerToggle }: PrimarySearchAppBarProps) {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
 
   const isMenuOpen = Boolean(anchorEl);
@@ -138,15 +131,15 @@ export default function PrimarySearchAppBar({ open, handleDrawerOpen }: PrimaryS
 
   return (
     <Box sx={{ flexGrow: 1 }}>
-      <StyledAppBar position="fixed" color="inherit" open={open} sx={{ backgroundColor: '#ffffff', boxShadow: 'none' }}>
+      <StyledAppBar position="fixed" color="inherit">
         <Toolbar>
           <IconButton
             size="large"
             edge="start"
             color="default"
-            aria-label="open drawer"
-            onClick={handleDrawerOpen}
-            sx={{ mr: 2, ...(open && { display: 'none' }) }}
+            aria-label="toggle drawer"
+            onClick={onDrawerToggle}
+            sx={(theme) => ({ mr: 2, zIndex: theme.zIndex.drawer + 3 })}
           >
             <MenuIcon />
           </IconButton>

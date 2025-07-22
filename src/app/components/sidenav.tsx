@@ -5,9 +5,6 @@ import { styled, useTheme, Theme, CSSObject } from '@mui/material/styles';
 import MuiDrawer from '@mui/material/Drawer';
 import List from '@mui/material/List';
 import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
@@ -41,69 +38,47 @@ const closedMixin = (theme: Theme): CSSObject => ({
   },
 });
 
-const DrawerHeader = styled('div')(({ theme }) => ({
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'flex-end',
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
-}));
-
 const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' })(
-  ({ theme }) => ({
+  ({ theme, open }) => ({
     width: drawerWidth,
     flexShrink: 0,
     whiteSpace: 'nowrap',
     boxSizing: 'border-box',
+    className: 'sidenav',
     '& .MuiDrawer-paper': {
+      className: 'sidenav-paper',
       borderColor: 'transparent',
+      borderRightWidth: 0, // Explicitly remove right border
+      ...(!open && {
+        borderWidth: 0,
+      }),
     },
-    variants: [
-      {
-        props: ({ open }) => open,
-        style: {
-          ...openedMixin(theme),
-          '& .MuiDrawer-paper': {
-            ...openedMixin(theme),
-            borderColor: 'transparent',
-          },
-        },
-      },
-      {
-        props: ({ open }) => !open,
-        style: {
-          ...closedMixin(theme),
-          '& .MuiDrawer-paper': {
-            ...closedMixin(theme),
-            borderColor: 'transparent',
-          },
-        },
-      },
-    ],
+    ...(open && {
+      ...openedMixin(theme),
+      '& .MuiDrawer-paper': openedMixin(theme),
+    }),
+    ...(!open && {
+      ...closedMixin(theme),
+      '& .MuiDrawer-paper': closedMixin(theme),
+    }),
+    zIndex: theme.zIndex.drawer + 1, // Below header
   }),
 );
 
 interface MiniDrawerProps {
   open: boolean;
-  handleDrawerOpen: () => void;
-  handleDrawerClose: () => void;
+  onDrawerToggle: () => void;
   onViewChange: (view: 'notes' | 'archive' | 'trash') => void;
   currentView: 'notes' | 'archive' | 'trash';
-  activeItem?: string; // New prop to track the active item
+  activeItem?: string;
 }
 
-export default function MiniDrawer({ open, handleDrawerOpen, handleDrawerClose, onViewChange, currentView, activeItem }: MiniDrawerProps) {
+export default function MiniDrawer({ open, onDrawerToggle, onViewChange, currentView, activeItem }: MiniDrawerProps) {
   const theme = useTheme();
 
   return (
     <Drawer variant="permanent" open={open}>
-      <DrawerHeader>
-        <IconButton onClick={handleDrawerClose}>
-          {theme.direction === 'rtl' ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-        </IconButton>
-      </DrawerHeader>
-      <Divider />
-      <List>
+      <List sx={{ pt: theme.spacing(8) }}>
         {[
           { text: 'Notes', icon: <LightbulbOutlined />, view: 'notes' },
           { text: 'Reminders', icon: <NotificationsOutlined />, view: 'notes' },
@@ -119,7 +94,18 @@ export default function MiniDrawer({ open, handleDrawerOpen, handleDrawerClose, 
                   px: 2.5,
                   borderTopRightRadius: 30,
                   borderBottomRightRadius: 30,
-                  backgroundColor: activeItem === item.text ? 'rgba(0, 0, 0, 0.08)' : 'transparent', // Use activeItem instead of currentView
+                  backgroundColor:
+                    (currentView === item.view && (item.view !== 'notes' || item.text === 'Notes'))
+                      ? 'rgba(251, 188, 4, 0.7)'
+                      : activeItem === item.text
+                      ? 'rgba(0, 0, 0, 0.08)'
+                      : 'transparent',
+                  '&:hover': {
+                    backgroundColor:
+                      (currentView === item.view && (item.view !== 'notes' || item.text === 'Notes'))
+                        ? 'rgba(251, 188, 4, 0.7)'
+                        : 'rgba(0, 0, 0, 0.04)',
+                  },
                 },
                 open
                   ? {
