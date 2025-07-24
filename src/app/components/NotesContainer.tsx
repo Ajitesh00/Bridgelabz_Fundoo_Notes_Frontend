@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -9,6 +9,12 @@ import {
   Tooltip,
   Menu,
   MenuItem,
+  Popper,
+  ClickAwayListener,
+  TextField,
+  Button,
+  Chip,
+  Stack
 } from '@mui/material';
 import {
   Archive,
@@ -21,7 +27,9 @@ import {
   PushPin,
   PushPinOutlined,
 } from '@mui/icons-material';
-import TakeNotes, { NoteIconState } from './TakeNotes'; // Adjust path as needed
+import TakeNotes, { NoteIconState } from './TakeNotes';
+import { setReminder } from '../services/note.service';
+import { format } from 'date-fns';
 
 // Types
 interface Note {
@@ -34,6 +42,8 @@ interface Note {
   isPinned?: boolean;
   isArchived?: boolean;
   isTrash?: boolean;
+  hasReminder?: boolean;
+  reminderDateTime?: Date | null;
 }
 
 interface NoteColor {
@@ -42,7 +52,6 @@ interface NoteColor {
   hex: string;
 }
 
-// Color palette for notes (same as TakeNotes)
 const NOTE_COLORS: NoteColor[] = [
   { name: 'Default', value: 'default', hex: '#ffffff' },
   { name: 'Red', value: 'red', hex: '#f28b82' },
@@ -60,12 +69,13 @@ const NOTE_COLORS: NoteColor[] = [
 
 interface NotesContainerProps {
   notes: Note[];
-  view: 'notes' | 'archive' | 'trash';
+  view: 'notes' | 'reminders' | 'archive' | 'trash';
   onUpdateNote?: (id: string, updatedNote: Partial<Note>) => void;
   onDeleteNote?: (id: string) => void;
   onArchiveNote?: (id: string) => void;
   onTrashNote?: (id: string) => void;
   onPinNote?: (id: string) => void;
+  onSetReminder?: (id: string, hasReminder: boolean, reminderDateTime: Date | null) => void;
   className?: string;
 }
 
@@ -77,9 +87,9 @@ interface NoteCardProps {
   onArchive: (id: string) => void;
   onTrash: (id: string) => void;
   onPin: (id: string) => void;
+  onSetReminder: (id: string, hasReminder: boolean, reminderDateTime: Date | null) => void;
 }
 
-// Individual Note Card Component
 const NoteCard: React.FC<NoteCardProps> = ({
   note,
   onEdit,
@@ -88,15 +98,21 @@ const NoteCard: React.FC<NoteCardProps> = ({
   onArchive,
   onTrash,
   onPin,
+  onSetReminder,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
+  const [reminderAnchorEl, setReminderAnchorEl] = useState<null | HTMLElement>(null);
+  const [reminderDateTime, setReminderDateTime] = useState<Date | null>(
+    note.reminderDateTime || null
+  );
+  const reminderIconRef = useRef<HTMLButtonElement>(null);
 
   const currentColor = NOTE_COLORS.find(color => color.value === note.color) || NOTE_COLORS[0];
 
   const handleColorSelect = (color: NoteColor) => {
-    onUpdate(note.id, { color: color.value }); // Update only color
+    onUpdate(note.id, { color: color.value });
     setColorMenuAnchor(null);
   };
 
@@ -121,6 +137,41 @@ const NoteCard: React.FC<NoteCardProps> = ({
     setMoreMenuAnchor(null);
   };
 
+  const handleReminderClick = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setReminderAnchorEl(reminderIconRef.current);
+  };
+
+  const handleReminderSave = async () => {
+    try {
+      await onSetReminder(note.id, !!reminderDateTime, reminderDateTime);
+      setReminderAnchorEl(null);
+    } catch (error) {
+      console.error('Failed to set reminder:', error);
+    }
+  };
+
+  const handleReminderCancel = () => {
+    setReminderDateTime(note.reminderDateTime || null);
+    setReminderAnchorEl(null);
+  };
+
+  const handleReminderDelete = async () => {
+    setReminderDateTime(null);
+    await onSetReminder(note.id, false, null); // Updates hasReminder to false
+    setReminderAnchorEl(null);
+  };
+
+  const handleChipDelete = () => {
+    console.info('You clicked the delete icon on the reminder chip.');
+    handleReminderDelete(); // Trigger the existing delete logic
+  };
+
+  const formatReminderDate = (date: Date | null) => {
+    if (!date) return '';
+    return format(new Date(date), 'MMM d, yyyy h:mm a');
+  };
+
   return (
     <Paper
       onClick={() => onEdit(note)}
@@ -131,10 +182,10 @@ const NoteCard: React.FC<NoteCardProps> = ({
         border: '1px solid #e0e0e0',
         borderRadius: '8px',
         padding: '12px',
+        paddingBottom: '20px',
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         position: 'relative',
-        minHeight: '120px',
         maxWidth: '250px',
         width: '100%',
         '&:hover': {
@@ -164,7 +215,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
       </Box>
 
       {/* Note content */}
-      <Box sx={{ paddingRight: '32px' }}>
+      <Box sx={{ paddingRight: '32px', paddingBottom: '8px' }}>
         {note.title && (
           <Typography
             variant="body1"
@@ -188,6 +239,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
               fontSize: '14px',
               lineHeight: '20px',
               whiteSpace: 'pre-wrap',
+              marginBottom: '30px',
             }}
           >
             {note.content}
@@ -195,7 +247,19 @@ const NoteCard: React.FC<NoteCardProps> = ({
         )}
       </Box>
 
-      {/* Bottom toolbar - appears on hover */}
+      {/* Reminder Chip - Clickable and Deletable */}
+      {note.hasReminder && note.reminderDateTime && (
+        <Stack direction="row" spacing={1} sx={{ mb: 3.5 }}>
+          <Chip
+            label={formatReminderDate(note.reminderDateTime)}
+            size="small"
+            sx={{ fontSize: '12px' }}
+            onDelete={handleChipDelete}
+          />
+        </Stack>
+      )}
+
+      {/* Bottom toolbar - appears on hover, positioned below content and chip with increased gap */}
       <Box
         sx={{
           position: 'absolute',
@@ -207,12 +271,20 @@ const NoteCard: React.FC<NoteCardProps> = ({
           alignItems: 'center',
           opacity: isHovered ? 1 : 0,
           transition: 'opacity 0.2s ease',
+          paddingTop: '16px',
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
           <Tooltip title="Remind me">
-            <IconButton size="small" onClick={(e) => e.stopPropagation()}>
-              <NotificationsNone fontSize="small" />
+            <IconButton
+              size="small"
+              onClick={handleReminderClick}
+              ref={reminderIconRef}
+            >
+              <NotificationsNone
+                fontSize="small"
+                color={note.hasReminder ? 'primary' : 'inherit'}
+              />
             </IconButton>
           </Tooltip>
           <Tooltip title="Collaborator">
@@ -305,11 +377,64 @@ const NoteCard: React.FC<NoteCardProps> = ({
           Delete Permanently
         </MenuItem>
       </Menu>
+
+      {/* Reminder Popper with New UI */}
+      <Popper
+        open={Boolean(reminderAnchorEl)}
+        anchorEl={reminderAnchorEl}
+        placement="bottom-start"
+        sx={{ zIndex: 1300 }}
+      >
+        <ClickAwayListener onClickAway={handleReminderCancel}>
+          <Box
+            sx={{
+              bgcolor: 'white',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+              borderRadius: '16px',
+              p: 2,
+              minWidth: '320px',
+              maxWidth: '340px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TextField
+              label="Reminder"
+              type="datetime-local"
+              value={reminderDateTime ? format(reminderDateTime, "yyyy-MM-dd'T'HH:mm") : ''}
+              onChange={(e) => setReminderDateTime(e.target.value ? new Date(e.target.value) : null)}
+              fullWidth
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{ sx: { borderRadius: '8px' } }}
+              sx={{ mb: 2, width: '100%' }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: 1 }}>
+              <Button
+                onClick={handleReminderCancel}
+                variant="text"
+                sx={{ textTransform: 'none', fontWeight: 500, color: 'text.secondary' }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleReminderSave}
+                variant="contained"
+                disabled={!reminderDateTime}
+                sx={{ textTransform: 'none', fontWeight: 500 }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Box>
+        </ClickAwayListener>
+      </Popper>
     </Paper>
   );
 };
 
-// Main NotesContainer component
 const NotesContainer: React.FC<NotesContainerProps> = ({
   notes,
   view,
@@ -318,12 +443,13 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
   onArchiveNote,
   onTrashNote,
   onPinNote,
+  onSetReminder,
   className,
 }) => {
   const [editingNote, setEditingNote] = useState<Note | null>(null);
 
   const handleEditNote = (note: Note) => {
-    setEditingNote(note); // Open edit view without triggering delete
+    setEditingNote(note);
   };
 
   const handleSaveEditedNote = (updatedNote: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -337,18 +463,17 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
   };
 
   const handleCloseEdit = () => {
-    setEditingNote(null); // Close edit view without delete
+    setEditingNote(null);
   };
 
-  // Filter notes based on view, using intent-based validation
   const filteredNotes = notes.filter(note => {
     const isEmpty = !note.title.trim() && !note.content.trim();
     if (view === 'archive') return note.isArchived && !note.isTrash && !isEmpty;
     if (view === 'trash') return note.isTrash && !isEmpty;
-    return !note.isArchived && !note.isTrash && !isEmpty; // Ensure only non-empty notes display
+    if (view === 'reminders') return note.hasReminder && !note.isTrash && !isEmpty;
+    return !note.isTrash && !isEmpty;
   });
 
-  // Separate pinned and regular notes
   const pinnedNotes = filteredNotes.filter(note => note.isPinned);
   const regularNotes = filteredNotes.filter(note => !note.isPinned);
 
@@ -363,7 +488,6 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
         position: 'relative',
       }}
     >
-      {/* Edit note overlay */}
       {editingNote && (
         <Box
           sx={{
@@ -399,7 +523,6 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
         </Box>
       )}
 
-      {/* Pinned notes section */}
       {pinnedNotes.length > 0 && (
         <Box sx={{ mb: 4 }}>
           <Typography
@@ -433,13 +556,13 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
                 onArchive={onArchiveNote || (() => {})}
                 onTrash={onTrashNote || (() => {})}
                 onPin={onPinNote || (() => {})}
+                onSetReminder={onSetReminder || (() => {})}
               />
             ))}
           </Box>
         </Box>
       )}
 
-      {/* Regular notes section */}
       {regularNotes.length > 0 && (
         <Box>
           {pinnedNotes.length > 0 && (
@@ -474,13 +597,13 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
                 onArchive={onArchiveNote || (() => {})}
                 onTrash={onTrashNote || (() => {})}
                 onPin={onPinNote || (() => {})}
+                onSetReminder={onSetReminder || (() => {})}
               />
             ))}
           </Box>
         </Box>
       )}
 
-      {/* Empty state */}
       {filteredNotes.length === 0 && (
         <Box
           sx={{
@@ -493,10 +616,10 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
           }}
         >
           <Typography variant="h6" sx={{ mb: 1 }}>
-            {view === 'archive' ? 'No archived notes' : view === 'trash' ? 'No trashed notes' : 'No notes yet'}
+            {view === 'archive' ? 'No archived notes' : view === 'trash' ? 'No trashed notes' : view === 'reminders' ? 'No reminders set' : 'No notes yet'}
           </Typography>
           <Typography variant="body2">
-            {view === 'archive' ? 'Archive some notes to see them here' : view === 'trash' ? 'Move some notes to trash to see them here' : 'Add a note to get started'}
+            {view === 'archive' ? 'Archive some notes to see them here' : view === 'trash' ? 'Move some notes to trash to see them here' : view === 'reminders' ? 'Set reminders for notes to see them here' : 'Add a note to get started'}
           </Typography>
         </Box>
       )}

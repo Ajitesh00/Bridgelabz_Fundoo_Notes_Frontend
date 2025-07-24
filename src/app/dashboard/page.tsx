@@ -10,7 +10,7 @@ import PrimarySearchAppBar from '../components/header';
 import MiniDrawer from '../components/sidenav';
 import TakeNotes from '../components/TakeNotes';
 import NotesContainer from '../components/NotesContainer';
-import { getAllNotes, createNote, updateNote, deleteNote, archiveNote, trashNote, pinNote } from '../services/note.service';
+import { getAllNotes, createNote, updateNote, deleteNote, archiveNote, trashNote, pinNote, setReminder } from '../services/note.service';
 
 interface Note {
   id: string;
@@ -22,6 +22,8 @@ interface Note {
   isPinned?: boolean;
   isArchived?: boolean;
   isTrash?: boolean;
+  hasReminder?: boolean;
+  reminderDateTime?: Date | null;
 }
 
 const drawerWidth = 240;
@@ -55,10 +57,10 @@ const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
 export default function Dashboard() {
   const [open, setOpen] = React.useState(false);
   const [notes, setNotes] = React.useState<Note[]>([]);
-  const [currentView, setCurrentView] = React.useState<'notes' | 'archive' | 'trash'>('notes');
+  const [currentView, setCurrentView] = React.useState<'notes' | 'reminders' | 'archive' | 'trash'>('notes');
   const [error, setError] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState<string>('');
 
-  // Fetch notes on component mount
   React.useEffect(() => {
     const fetchNotes = async () => {
       try {
@@ -75,9 +77,25 @@ export default function Dashboard() {
     setOpen(!open);
   };
 
-  const handleViewChange = (view: 'notes' | 'archive' | 'trash') => {
+  const handleViewChange = (view: 'notes' | 'reminders' | 'archive' | 'trash') => {
     setCurrentView(view);
   };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+  };
+
+  const filteredNotes = notes.filter(note => {
+    const matchesSearch = searchQuery
+      ? note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.content.toLowerCase().includes(searchQuery.toLowerCase())
+      : true;
+    const isEmpty = !note.title.trim() && !note.content.trim();
+    if (currentView === 'archive') return note.isArchived && !note.isTrash && !isEmpty && matchesSearch;
+    if (currentView === 'trash') return note.isTrash && !isEmpty && matchesSearch;
+    if (currentView === 'reminders') return note.hasReminder && !note.isTrash && !isEmpty && matchesSearch;
+    return !note.isTrash && !isEmpty && matchesSearch;
+  });
 
   const handleSaveNote = async (noteData: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!noteData.title.trim() && !noteData.content.trim()) {
@@ -89,6 +107,8 @@ export default function Dashboard() {
         title: noteData.title,
         content: noteData.content,
         color: noteData.color || 'default',
+        hasReminder: noteData.hasReminder || false,
+        reminderDateTime: noteData.reminderDateTime || null
       });
       setNotes(prev => [...prev, newNote]);
     } catch (error) {
@@ -169,6 +189,21 @@ export default function Dashboard() {
     }
   };
 
+  const handleSetReminder = async (id: string, hasReminder: boolean, reminderDateTime: Date | null) => {
+    try {
+      const updatedNote = await setReminder(id, hasReminder, reminderDateTime);
+      setNotes(prev =>
+        prev.map(note =>
+          note.id === id
+            ? { ...note, hasReminder: updatedNote.hasReminder, reminderDateTime: updatedNote.reminderDateTime, updatedAt: new Date() }
+            : note
+        )
+      );
+    } catch (error) {
+      setError('Failed to set/unset reminder');
+    }
+  };
+
   const handleNoteClose = () => {
     // No action needed, just close the note editor
   };
@@ -176,7 +211,11 @@ export default function Dashboard() {
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <CssBaseline />
-      <PrimarySearchAppBar open={open} onDrawerToggle={handleDrawerToggle} />
+      <PrimarySearchAppBar
+        open={open}
+        onDrawerToggle={handleDrawerToggle}
+        onSearch={handleSearch}
+      />
       <MiniDrawer
         open={open}
         onDrawerToggle={handleDrawerToggle}
@@ -225,13 +264,14 @@ export default function Dashboard() {
           }}
         >
           <NotesContainer
-            notes={notes}
+            notes={filteredNotes}
             view={currentView}
             onUpdateNote={handleUpdateNote}
             onDeleteNote={handleDeleteNote}
             onArchiveNote={handleArchiveNote}
             onTrashNote={handleTrashNote}
             onPinNote={handlePinNote}
+            onSetReminder={handleSetReminder}
           />
         </Container>
       </Main>

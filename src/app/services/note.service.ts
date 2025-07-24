@@ -18,6 +18,8 @@ interface Note {
   isPinned: boolean;
   isArchived: boolean;
   isTrash: boolean;
+  hasReminder: boolean;
+  reminderDateTime: Date | null;
 }
 
 // Define input for creating/updating notes
@@ -25,6 +27,8 @@ interface NoteInput {
   title: string;
   content: string;
   color: string;
+  hasReminder?: boolean;
+  reminderDateTime?: Date | null;
 }
 
 // Base URL for API
@@ -35,7 +39,7 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
   if (!backendNote) {
     console.error('backendNote is undefined or null:', backendNote);
     return {
-      id: generateUniqueId(), // Generate unique ID if backend data is missing
+      id: generateUniqueId(),
       title: originalInput?.title || '',
       content: originalInput?.content || '',
       color: originalInput?.color || 'default',
@@ -43,12 +47,14 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
       updatedAt: new Date(),
       isPinned: false,
       isArchived: false,
-      isTrash: false
+      isTrash: false,
+      hasReminder: false,
+      reminderDateTime: null
     };
   }
-  console.log('Mapping backendNote:', backendNote); // Debug log
+  console.log('Mapping backendNote:', backendNote);
   return {
-    id: backendNote.id ? backendNote.id.toString() : generateUniqueId(), // Ensure unique ID
+    id: backendNote.id ? backendNote.id.toString() : generateUniqueId(),
     title: backendNote.title || originalInput?.title || '',
     content: backendNote.description || originalInput?.content || '',
     color: backendNote.color || originalInput?.color || 'default',
@@ -56,7 +62,9 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
     updatedAt: new Date(backendNote.updatedAt || Date.now()),
     isPinned: backendNote.isPinned || false,
     isArchived: backendNote.isArchived || false,
-    isTrash: backendNote.isTrash || false
+    isTrash: backendNote.isTrash || false,
+    hasReminder: backendNote.hasReminder || false,
+    reminderDateTime: backendNote.reminderDateTime ? new Date(backendNote.reminderDateTime) : null
   };
 };
 
@@ -93,19 +101,18 @@ export const getNoteById = async (id: string): Promise<Note> => {
 // Create a new note
 export const createNote = async (note: NoteInput): Promise<Note> => {
   try {
-    console.log('Sending POST to:', API_BASE_URL);
-    console.log('Payload:', { title: note.title, description: note.content, color: note.color });
-    console.log('Token:', localStorage.getItem('token'));
     const response = await axios.post(API_BASE_URL, {
       title: note.title,
       description: note.content,
-      color: note.color
+      color: note.color,
+      hasReminder: note.hasReminder || false,
+      reminderDateTime: note.reminderDateTime || null
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     });
     console.log('createNote response:', JSON.stringify(response.data, null, 2));
-    return mapToFrontendNote(response.data.data, note); // Pass original input to preserve intent
-  } catch (error:any) {
+    return mapToFrontendNote(response.data.data, note);
+  } catch (error: any) {
     console.error('Failed to create note:', error);
     console.error('Error response:', error.response?.data);
     throw error;
@@ -181,6 +188,23 @@ export const pinNote = async (id: string): Promise<Note> => {
     return mapToFrontendNote(response.data.data);
   } catch (error) {
     console.error(`Failed to pin/unpin note ${id}:`, error);
+    throw error;
+  }
+};
+
+// Set or unset a reminder for a note by ID
+export const setReminder = async (id: string, hasReminder: boolean, reminderDateTime: Date | null): Promise<Note> => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/${id}/reminder`, {
+      hasReminder,
+      reminderDateTime
+    }, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    console.log('setReminder response:', JSON.stringify(response.data, null, 2));
+    return mapToFrontendNote(response.data.data);
+  } catch (error) {
+    console.error(`Failed to set/unset reminder for note ${id}:`, error);
     throw error;
   }
 };

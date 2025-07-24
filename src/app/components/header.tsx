@@ -86,16 +86,18 @@ const StyledAppBar = styled(AppBar, {
   width: '100%',
   backgroundColor: '#ffffff',
   boxShadow: 'none',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.12)', // Matching the default MUI Drawer border
+  borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
 }));
 
 interface PrimarySearchAppBarProps {
   open: boolean;
   onDrawerToggle: () => void;
+  onSearch: (query: string) => void; // Added callback for search
 }
 
-export default function PrimarySearchAppBar({ open, onDrawerToggle }: PrimarySearchAppBarProps) {
+export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: PrimarySearchAppBarProps) {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [searchQuery, setSearchQuery] = React.useState<string>(''); // State for search query
 
   const isMenuOpen = Boolean(anchorEl);
 
@@ -105,6 +107,13 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle }: PrimarySea
 
   const handleMenuClose = () => {
     setAnchorEl(null);
+  };
+
+  // Handle search input changes
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const query = event.target.value;
+    setSearchQuery(query);
+    onSearch(query); // Pass query to parent
   };
 
   const menuId = 'primary-search-account-menu';
@@ -166,6 +175,8 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle }: PrimarySea
             <StyledInputBase
               placeholder="Search…"
               inputProps={{ 'aria-label': 'search' }}
+              value={searchQuery}
+              onChange={handleSearchChange} // Handle input changes
             />
           </Search>
           <Box sx={{ flexGrow: 1 }} />

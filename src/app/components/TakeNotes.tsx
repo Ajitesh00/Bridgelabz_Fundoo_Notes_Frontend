@@ -1,8 +1,6 @@
-// TakeNotes.tsx
-
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   TextField,
@@ -29,6 +27,8 @@ interface Note {
   isPinned?: boolean;
   isArchived?: boolean;
   isTrash?: boolean;
+  hasReminder?: boolean;
+  reminderDateTime?: Date | null;
 }
 
 interface NoteColor {
@@ -37,7 +37,6 @@ interface NoteColor {
   hex: string;
 }
 
-// Note state interface
 interface NoteState {
   isExpanded: boolean;
   title: string;
@@ -45,7 +44,6 @@ interface NoteState {
   color: string;
 }
 
-// Icon state interface for external use
 export interface NoteIconState {
   formatBold: boolean;
   formatItalic: boolean;
@@ -65,10 +63,9 @@ interface TakeNotesProps {
   onArchive?: (id: string) => void;
   onTrash?: (id: string) => void;
   className?: string;
-  initialNote?: Note; // For editing existing notes
+  initialNote?: Note;
 }
 
-// Color palette for notes
 const NOTE_COLORS: NoteColor[] = [
   { name: 'Default', value: 'default', hex: '#ffffff' },
   { name: 'Red', value: 'red', hex: '#f28b82' },
@@ -85,7 +82,6 @@ const NOTE_COLORS: NoteColor[] = [
 ];
 
 export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTrash, className, initialNote }: TakeNotesProps) {
-  // Note state
   const [noteState, setNoteState] = useState<NoteState>({
     isExpanded: !!initialNote,
     title: initialNote?.title || '',
@@ -93,7 +89,6 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     color: initialNote?.color || 'default',
   });
   
-  // Icon states for external use
   const [iconState, setIconState] = useState<NoteIconState>({
     formatBold: false,
     formatItalic: false,
@@ -102,38 +97,42 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     hasCheckbox: false,
     isArchived: initialNote?.isArchived || false,
     isTrash: initialNote?.isTrash || false,
-    hasReminder: false,
+    hasReminder: initialNote?.hasReminder || false,
     hasCollaborator: false,
   });
 
-  // Update state when initialNote changes
+  const contentRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     if (initialNote) {
       setNoteState({
         isExpanded: true,
-        title: initialNote.title || '', // Ensure string
-        content: initialNote.content || '', // Ensure string
+        title: initialNote.title || '',
+        content: initialNote.content || '',
         color: initialNote.color || 'default',
       });
       setIconState(prev => ({
         ...prev,
         isArchived: initialNote.isArchived || false,
         isTrash: initialNote.isTrash || false,
+        hasReminder: initialNote.hasReminder || false,
       }));
     }
   }, [initialNote]);
 
-  // Get current note color
+  useEffect(() => {
+    if (noteState.isExpanded && !initialNote && contentRef.current) {
+      contentRef.current.focus();
+    }
+  }, [noteState.isExpanded, initialNote]);
+
   const currentColor = NOTE_COLORS.find(color => color.value === noteState.color) || NOTE_COLORS[0];
 
-  // Handle expanding the note
   const handleExpand = () => {
     setNoteState(prev => ({ ...prev, isExpanded: true }));
   };
 
-  // Handle closing the note
   const handleClose = () => {
-    // Save note if there's content
     if ((noteState.title?.trim() || noteState.content?.trim())) {
       onSaveNote?.({
         title: noteState.title || '',
@@ -141,10 +140,10 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
         color: noteState.color,
         isArchived: iconState.isArchived,
         isTrash: iconState.isTrash,
+        hasReminder: iconState.hasReminder,
       });
     }
     
-    // Reset state only if not editing an existing note
     if (!initialNote) {
       setNoteState({
         isExpanded: false,
@@ -165,16 +164,13 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
       });
     }
     
-    // Call external close handler
     onClose?.();
   };
 
-  // Handle color selection
   const handleColorSelect = (color: NoteColor) => {
     setNoteState(prev => ({ ...prev, color: color.value }));
   };
 
-  // Handle icon toggles
   const toggleIcon = (iconName: keyof NoteIconState) => {
     setIconState(prev => ({
       ...prev,
@@ -182,7 +178,6 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     }));
   };
 
-  // Handle click away
   const handleClickAway = () => {
     if (noteState.isExpanded && (noteState.title?.trim() || noteState.content?.trim())) {
       handleClose();
@@ -193,7 +188,6 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     }
   };
 
-  // Common styles for both states to ensure consistent positioning
   const commonStyles = {
     backgroundColor: currentColor.hex,
     border: '1px solid #e0e0e0',
@@ -206,13 +200,12 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     position: 'relative',
   };
 
-  // Collapsed state - only show if not editing existing note
   if (!noteState.isExpanded && !initialNote) {
     return (
       <ClickAwayListener onClickAway={handleClickAway}>
         <Paper
           onClick={handleExpand}
-          className={`hover:shadow-md transition-shadow ${className}`}
+          className={`hover:shadow-md transition-shadow ${className || ''}`}
           sx={{
             ...commonStyles,
             minHeight: '46px',
@@ -248,22 +241,20 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     );
   }
 
-  // Expanded state
   return (
     <ClickAwayListener onClickAway={handleClickAway}>
       <Paper
-        className={`transition-shadow ${className}`}
+        className={`transition-shadow ${className || ''}`}
         sx={{
           ...commonStyles,
           minHeight: '70px',
-          paddingBottom: '40px', // Space for toolbar
+          paddingBottom: '40px',
         }}
       >
         <Box>
-          {/* Title input */}
           <TextField
             placeholder="Title"
-            value={noteState.title || ''} // Ensure controlled input
+            value={noteState.title || ''}
             onChange={(e) => setNoteState(prev => ({ ...prev, title: e.target.value }))}
             variant="standard"
             fullWidth
@@ -282,16 +273,15 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
               },
             }}
           />
-
-          {/* Content input */}
           <TextField
             placeholder="Take a note..."
-            value={noteState.content || ''} // Ensure controlled input
+            value={noteState.content || ''}
             onChange={(e) => setNoteState(prev => ({ ...prev, content: e.target.value }))}
             variant="standard"
             fullWidth
             multiline
             minRows={1}
+            inputRef={contentRef}
             sx={{
               mb: 1,
               '& .MuiInput-underline:before': { display: 'none' },
@@ -306,8 +296,6 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
             }}
           />
         </Box>
-
-        {/* Toolbar - Pinned to bottom */}
         <NoteIcons
           noteColor={noteState.color}
           iconState={iconState}

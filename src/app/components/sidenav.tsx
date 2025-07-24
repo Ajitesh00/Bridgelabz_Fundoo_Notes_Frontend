@@ -14,6 +14,7 @@ import NotificationsOutlined from '@mui/icons-material/NotificationsOutlined';
 import LabelOutlined from '@mui/icons-material/LabelOutlined';
 import ArchiveOutlined from '@mui/icons-material/ArchiveOutlined';
 import DeleteOutlined from '@mui/icons-material/DeleteOutlined';
+import './sidenav.css';
 
 const drawerWidth = 240;
 
@@ -48,10 +49,7 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
     '& .MuiDrawer-paper': {
       className: 'sidenav-paper',
       borderColor: 'transparent',
-      borderRightWidth: 0, // Explicitly remove right border
-      ...(!open && {
-        borderWidth: 0,
-      }),
+      borderRightWidth: 0,
     },
     ...(open && {
       ...openedMixin(theme),
@@ -61,19 +59,18 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== 'open' 
       ...closedMixin(theme),
       '& .MuiDrawer-paper': closedMixin(theme),
     }),
-    zIndex: theme.zIndex.drawer + 1, // Below header
+    zIndex: theme.zIndex.drawer + 1,
   }),
 );
 
 interface MiniDrawerProps {
   open: boolean;
   onDrawerToggle: () => void;
-  onViewChange: (view: 'notes' | 'archive' | 'trash') => void;
-  currentView: 'notes' | 'archive' | 'trash';
-  activeItem?: string;
+  onViewChange: (view: 'notes' | 'reminders' | 'archive' | 'trash') => void;
+  currentView: 'notes' | 'reminders' | 'archive' | 'trash';
 }
 
-export default function MiniDrawer({ open, onDrawerToggle, onViewChange, currentView, activeItem }: MiniDrawerProps) {
+export default function MiniDrawer({ open, onDrawerToggle, onViewChange, currentView }: MiniDrawerProps) {
   const theme = useTheme();
 
   return (
@@ -81,7 +78,7 @@ export default function MiniDrawer({ open, onDrawerToggle, onViewChange, current
       <List sx={{ pt: theme.spacing(8) }}>
         {[
           { text: 'Notes', icon: <LightbulbOutlined />, view: 'notes' },
-          { text: 'Reminders', icon: <NotificationsOutlined />, view: 'notes' },
+          { text: 'Reminders', icon: <NotificationsOutlined />, view: 'reminders' },
           { text: 'Labels', icon: <LabelOutlined />, view: 'notes' },
           { text: 'Archive', icon: <ArchiveOutlined />, view: 'archive' },
           { text: 'Trash', icon: <DeleteOutlined />, view: 'trash' },
@@ -95,15 +92,13 @@ export default function MiniDrawer({ open, onDrawerToggle, onViewChange, current
                   borderTopRightRadius: 30,
                   borderBottomRightRadius: 30,
                   backgroundColor:
-                    (currentView === item.view && (item.view !== 'notes' || item.text === 'Notes'))
-                      ? 'rgba(251, 188, 4, 0.7)'
-                      : activeItem === item.text
-                      ? 'rgba(0, 0, 0, 0.08)'
+                    currentView === item.view && (item.view !== 'notes' || item.text === 'Notes')
+                      ? 'rgba(254, 239, 195, 1)'
                       : 'transparent',
                   '&:hover': {
                     backgroundColor:
-                      (currentView === item.view && (item.view !== 'notes' || item.text === 'Notes'))
-                        ? 'rgba(251, 188, 4, 0.7)'
+                      currentView === item.view && (item.view !== 'notes' || item.text === 'Notes')
+                        ? 'rgba(254, 239, 195, 1)'
                         : 'rgba(0, 0, 0, 0.04)',
                   },
                 },
@@ -115,7 +110,7 @@ export default function MiniDrawer({ open, onDrawerToggle, onViewChange, current
                       justifyContent: 'center',
                     },
               ]}
-              onClick={() => onViewChange(item.view as 'notes' | 'archive' | 'trash')}
+              onClick={() => onViewChange(item.view as 'notes' | 'reminders' | 'archive' | 'trash')}
             >
               <ListItemIcon
                 sx={[
