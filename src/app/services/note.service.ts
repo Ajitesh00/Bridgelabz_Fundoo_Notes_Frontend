@@ -1,5 +1,3 @@
-// note.service.ts
-
 import axios from 'axios';
 
 // Generate a simple unique ID using timestamp and random number
@@ -20,6 +18,7 @@ interface Note {
   isTrash: boolean;
   hasReminder: boolean;
   reminderDateTime: Date | null;
+  labels: string[]; // Added labels field
 }
 
 // Define input for creating/updating notes
@@ -29,6 +28,7 @@ interface NoteInput {
   color: string;
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
+  labels?: string[]; // Added labels field
 }
 
 // Base URL for API
@@ -49,7 +49,8 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
       isArchived: false,
       isTrash: false,
       hasReminder: false,
-      reminderDateTime: null
+      reminderDateTime: null,
+      labels: originalInput?.labels || [] // Default to empty array if no labels
     };
   }
   console.log('Mapping backendNote:', backendNote);
@@ -64,7 +65,8 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
     isArchived: backendNote.isArchived || false,
     isTrash: backendNote.isTrash || false,
     hasReminder: backendNote.hasReminder || false,
-    reminderDateTime: backendNote.reminderDateTime ? new Date(backendNote.reminderDateTime) : null
+    reminderDateTime: backendNote.reminderDateTime ? new Date(backendNote.reminderDateTime) : null,
+    labels: backendNote.labels || [] // Normalize NULL to []
   };
 };
 
@@ -106,7 +108,8 @@ export const createNote = async (note: NoteInput): Promise<Note> => {
       description: note.content,
       color: note.color,
       hasReminder: note.hasReminder || false,
-      reminderDateTime: note.reminderDateTime || null
+      reminderDateTime: note.hasReminder ? note.reminderDateTime || null : null,
+      labels: note.labels || null // Include labels
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     });
@@ -125,7 +128,8 @@ export const updateNote = async (id: string, note: Partial<NoteInput>): Promise<
     const response = await axios.put(`${API_BASE_URL}/${id}`, {
       title: note.title,
       description: note.content,
-      color: note.color
+      color: note.color,
+      labels: note.labels !== undefined ? note.labels : undefined // Include labels if provided
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     });
@@ -205,6 +209,35 @@ export const setReminder = async (id: string, hasReminder: boolean, reminderDate
     return mapToFrontendNote(response.data.data);
   } catch (error) {
     console.error(`Failed to set/unset reminder for note ${id}:`, error);
+    throw error;
+  }
+};
+
+// Add a label to a note by ID
+export const addLabel = async (id: string, label: string): Promise<Note> => {
+  try {
+    const response = await axios.post(`${API_BASE_URL}/${id}/labels`, { name: label }, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    console.log('addLabel response:', JSON.stringify(response.data, null, 2));
+    return mapToFrontendNote(response.data.data);
+  } catch (error) {
+    console.error(`Failed to add label to note ${id}:`, error);
+    throw error;
+  }
+};
+
+// Remove all labels from a note by ID
+export const removeLabels = async (id: string, label?: string): Promise<Note> => {
+  try {
+    const response = await axios.delete(`${API_BASE_URL}/${id}/labels`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      data: label ? { name: label } : {}, // Send label if provided, else empty body to clear all
+    });
+    console.log('removeLabels response:', JSON.stringify(response.data, null, 2));
+    return mapToFrontendNote(response.data.data);
+  } catch (error) {
+    console.error(`Failed to remove labels from note ${id}:`, error);
     throw error;
   }
 };

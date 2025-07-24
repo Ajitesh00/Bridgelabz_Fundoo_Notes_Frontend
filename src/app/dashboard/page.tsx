@@ -24,6 +24,7 @@ interface Note {
   isTrash?: boolean;
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
+  labels: string[];
 }
 
 const drawerWidth = 240;
@@ -88,7 +89,8 @@ export default function Dashboard() {
   const filteredNotes = notes.filter(note => {
     const matchesSearch = searchQuery
       ? note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        note.content.toLowerCase().includes(searchQuery.toLowerCase())
+        note.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        note.labels.some(label => label.toLowerCase().includes(searchQuery.toLowerCase()))
       : true;
     const isEmpty = !note.title.trim() && !note.content.trim();
     if (currentView === 'archive') return note.isArchived && !note.isTrash && !isEmpty && matchesSearch;
@@ -106,9 +108,10 @@ export default function Dashboard() {
       const newNote = await createNote({
         title: noteData.title,
         content: noteData.content,
-        color: noteData.color || 'default',
+        color: noteData.color,
         hasReminder: noteData.hasReminder || false,
-        reminderDateTime: noteData.reminderDateTime || null
+        reminderDateTime: noteData.hasReminder ? noteData.reminderDateTime || null : null,
+        labels: noteData.labels || []
       });
       setNotes(prev => [...prev, newNote]);
     } catch (error) {
@@ -122,6 +125,7 @@ export default function Dashboard() {
         title: updatedNote.title,
         content: updatedNote.content,
         color: updatedNote.color,
+        labels: updatedNote.labels
       });
       setNotes(prev =>
         prev.map(note =>
@@ -247,6 +251,7 @@ export default function Dashboard() {
                 onArchive={handleArchiveNote}
                 onTrash={handleTrashNote}
                 onPin={handlePinNote}
+                onUpdate={handleUpdateNote}
               />
             </Box>
           </Box>

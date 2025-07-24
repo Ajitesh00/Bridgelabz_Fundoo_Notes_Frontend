@@ -1,14 +1,16 @@
-// NoteIcons.tsx
-
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   IconButton,
   Tooltip,
   Menu,
   MenuItem,
+  Popper,
+  ClickAwayListener,
+  TextField,
+  Button
 } from '@mui/material';
 import {
   FormatBold,
@@ -27,9 +29,26 @@ import {
   Close,
   PushPin,
   PushPinOutlined,
+  LabelOutlined
 } from '@mui/icons-material';
+import { addLabel, removeLabels } from '../services/note.service';
 
 // Types
+interface Note {
+  id: string;
+  title: string;
+  content: string;
+  color: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isPinned?: boolean;
+  isArchived?: boolean;
+  isTrash?: boolean;
+  hasReminder?: boolean;
+  reminderDateTime?: Date | null;
+  labels: string[];
+}
+
 interface NoteColor {
   name: string;
   value: string;
@@ -56,6 +75,7 @@ interface NoteIconsProps {
   onArchive?: (id: string) => void;
   onTrash?: (id: string) => void;
   onDelete?: (id: string) => void;
+  onUpdate?: (id: string, updatedNote: Partial<Note>) => void;
   isPinned?: boolean;
   onClose?: () => void;
   isHovered?: boolean;
@@ -86,6 +106,7 @@ const NoteIcons: React.FC<NoteIconsProps> = ({
   onArchive,
   onTrash,
   onDelete,
+  onUpdate,
   isPinned,
   onClose,
   isHovered = true,
@@ -93,12 +114,52 @@ const NoteIcons: React.FC<NoteIconsProps> = ({
 }) => {
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
+  const [labelAnchorEl, setLabelAnchorEl] = useState<null | HTMLElement>(null);
+  const [labelInput, setLabelInput] = useState('');
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const labelIconRef = useRef<HTMLButtonElement>(null);
 
   const currentColor = NOTE_COLORS.find(color => color.value === noteColor) || NOTE_COLORS[0];
 
   const handleIconClick = (iconName: keyof NoteIconState) => (e: React.MouseEvent) => {
     e.stopPropagation();
     onToggleIcon?.(iconName);
+  };
+
+  const handleAddLabel = async () => {
+    if (!id) return;
+    if (!labelInput.trim()) {
+      setLabelError('Label name cannot be empty');
+      return;
+    }
+    try {
+      const labels = labelInput.split(',').map(label => label.trim()).filter(label => label);
+      let updatedNote: Note | null = null;
+      for (const label of labels) {
+        updatedNote = await addLabel(id, label);
+      }
+      if (updatedNote && onUpdate) {
+        onUpdate(id, { labels: updatedNote.labels });
+      }
+      setLabelInput('');
+      setLabelAnchorEl(null);
+      setLabelError(null);
+    } catch (error) {
+      setLabelError('Failed to add label');
+    }
+  };
+
+  const handleRemoveLabels = async () => {
+    if (!id) return;
+    try {
+      const updatedNote = await removeLabels(id);
+      if (onUpdate) {
+        onUpdate(id, { labels: updatedNote.labels });
+      }
+      setMoreMenuAnchor(null);
+    } catch (error) {
+      setLabelError('Failed to remove labels');
+    }
   };
 
   return (
@@ -274,23 +335,93 @@ const NoteIcons: React.FC<NoteIconsProps> = ({
         open={Boolean(moreMenuAnchor)}
         onClose={() => setMoreMenuAnchor(null)}
       >
-        {id && (
-          <>
-            <MenuItem onClick={() => { onArchive?.(id); setMoreMenuAnchor(null); }}>
-              <Archive fontSize="small" sx={{ mr: 1 }} />
-              {iconState.isArchived ? 'Unarchive' : 'Archive'}
-            </MenuItem>
-            <MenuItem onClick={() => { onTrash?.(id); setMoreMenuAnchor(null); }}>
-              <Delete fontSize="small" sx={{ mr: 1 }} />
-              {iconState.isTrash ? 'Restore' : 'Move to Trash'}
-            </MenuItem>
-            <MenuItem onClick={() => { onDelete?.(id); setMoreMenuAnchor(null); }}>
-              <Delete fontSize="small" sx={{ mr: 1 }} />
-              Delete Permanently
-            </MenuItem>
-          </>
-        )}
+        {id ? [
+          // <MenuItem
+          //   key="add-label"
+          //   onClick={(e) => {
+          //     e.stopPropagation();
+          //     setMoreMenuAnchor(null);
+          //     setLabelAnchorEl(labelIconRef.current);
+          //   }}
+          // >
+          //   <LabelOutlined fontSize="small" sx={{ mr: 1 }} />
+          //   Add Label
+          // </MenuItem>,
+          // <MenuItem key="remove-labels" onClick={handleRemoveLabels}>
+          //   <LabelOutlined fontSize="small" sx={{ mr: 1 }} />
+          //   Remove Labels
+          // </MenuItem>,
+          <MenuItem key="archive" onClick={() => { onArchive?.(id); setMoreMenuAnchor(null); }}>
+            <Archive fontSize="small" sx={{ mr: 1 }} />
+            {iconState.isArchived ? 'Unarchive' : 'Archive'}
+          </MenuItem>,
+          <MenuItem key="trash" onClick={() => { onTrash?.(id); setMoreMenuAnchor(null); }}>
+            <Delete fontSize="small" sx={{ mr: 1 }} />
+            {iconState.isTrash ? 'Restore' : 'Move to Trash'}
+          </MenuItem>,
+          <MenuItem key="delete" onClick={() => { onDelete?.(id); setMoreMenuAnchor(null); }}>
+            <Delete fontSize="small" sx={{ mr: 1 }} />
+            Delete Permanently
+          </MenuItem>
+        ] : null}
       </Menu>
+
+      {/* Label input Popper */}
+      <Popper
+        open={Boolean(labelAnchorEl)}
+        anchorEl={labelAnchorEl}
+        placement="bottom-start"
+        sx={{ zIndex: 1300 }}
+      >
+        <ClickAwayListener onClickAway={() => setLabelAnchorEl(null)}>
+          <Box
+            sx={{
+              bgcolor: 'white',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+              borderRadius: '16px',
+              p: 2,
+              minWidth: '320px',
+              maxWidth: '340px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TextField
+              label="Add Labels (comma-separated)"
+              value={labelInput}
+              onChange={(e) => {
+                setLabelInput(e.target.value);
+                setLabelError(null);
+              }}
+              fullWidth
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{ sx: { borderRadius: '8px' } }}
+              sx={{ mb: 2, width: '100%' }}
+              error={!!labelError}
+              helperText={labelError}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: 1 }}>
+              <Button
+                onClick={() => setLabelAnchorEl(null)}
+                variant="text"
+                sx={{ textTransform: 'none', fontWeight: 500, color: 'text.secondary' }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAddLabel}
+                variant="contained"
+                sx={{ textTransform: 'none', fontWeight: 500 }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Box>
+        </ClickAwayListener>
+      </Popper>
     </>
   );
 };

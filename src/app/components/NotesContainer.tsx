@@ -28,8 +28,9 @@ import {
   PushPinOutlined,
 } from '@mui/icons-material';
 import TakeNotes, { NoteIconState } from './TakeNotes';
-import { setReminder } from '../services/note.service';
+import { setReminder, addLabel, removeLabels } from '../services/note.service';
 import { format } from 'date-fns';
+import './NotesContainer.css';
 
 // Types
 interface Note {
@@ -44,6 +45,7 @@ interface Note {
   isTrash?: boolean;
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
+  labels: string[];
 }
 
 interface NoteColor {
@@ -158,13 +160,17 @@ const NoteCard: React.FC<NoteCardProps> = ({
 
   const handleReminderDelete = async () => {
     setReminderDateTime(null);
-    await onSetReminder(note.id, false, null); // Updates hasReminder to false
+    await onSetReminder(note.id, false, null);
     setReminderAnchorEl(null);
   };
 
-  const handleChipDelete = () => {
-    console.info('You clicked the delete icon on the reminder chip.');
-    handleReminderDelete(); // Trigger the existing delete logic
+  const handleLabelDelete = async (label: string) => {
+    try {
+      const updatedNote = await removeLabels(note.id, label);
+      onUpdate(note.id, { labels: updatedNote.labels });
+    } catch (error) {
+      console.error('Failed to delete label:', error);
+    }
   };
 
   const formatReminderDate = (date: Date | null) => {
@@ -239,7 +245,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
               fontSize: '14px',
               lineHeight: '20px',
               whiteSpace: 'pre-wrap',
-              marginBottom: '30px',
+              marginBottom: note.hasReminder || note.labels.length > 0 ? '18px' : '30px',
             }}
           >
             {note.content}
@@ -247,15 +253,26 @@ const NoteCard: React.FC<NoteCardProps> = ({
         )}
       </Box>
 
-      {/* Reminder Chip - Clickable and Deletable */}
-      {note.hasReminder && note.reminderDateTime && (
-        <Stack direction="row" spacing={1} sx={{ mb: 3.5 }}>
-          <Chip
-            label={formatReminderDate(note.reminderDateTime)}
-            size="small"
-            sx={{ fontSize: '12px' }}
-            onDelete={handleChipDelete}
-          />
+      {/* Reminder and Label Chips */}
+      {(note.hasReminder || note.labels.length > 0) && (
+        <Stack direction="row" spacing={1} sx={{ mb: 3.5, flexWrap: 'wrap', gap: 1 }}>
+          {note.hasReminder && note.reminderDateTime && (
+            <Chip
+              label={formatReminderDate(note.reminderDateTime)}
+              size="small"
+              sx={{ fontSize: '12px' }}
+              onDelete={handleReminderDelete}
+            />
+          )}
+          {note.labels.map((label) => (
+            <Chip
+              key={label}
+              label={label}
+              size="small"
+              sx={{ fontSize: '12px' }}
+              onDelete={() => handleLabelDelete(label)}
+            />
+          ))}
         </Stack>
       )}
 
@@ -378,7 +395,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
         </MenuItem>
       </Menu>
 
-      {/* Reminder Popper with New UI */}
+      {/* Reminder Popper */}
       <Popper
         open={Boolean(reminderAnchorEl)}
         anchorEl={reminderAnchorEl}
@@ -471,7 +488,7 @@ const NotesContainer: React.FC<NotesContainerProps> = ({
     if (view === 'archive') return note.isArchived && !note.isTrash && !isEmpty;
     if (view === 'trash') return note.isTrash && !isEmpty;
     if (view === 'reminders') return note.hasReminder && !note.isTrash && !isEmpty;
-    return !note.isTrash && !isEmpty;
+    return !note.isTrash && !note.isArchived && !isEmpty;
   });
 
   const pinnedNotes = filteredNotes.filter(note => note.isPinned);

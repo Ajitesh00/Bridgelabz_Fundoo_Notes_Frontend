@@ -29,6 +29,7 @@ interface Note {
   isTrash?: boolean;
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
+  labels: string[];
 }
 
 interface NoteColor {
@@ -42,6 +43,7 @@ interface NoteState {
   title: string;
   content: string;
   color: string;
+  labels: string;
 }
 
 export interface NoteIconState {
@@ -62,6 +64,7 @@ interface TakeNotesProps {
   onPin?: (id: string) => void;
   onArchive?: (id: string) => void;
   onTrash?: (id: string) => void;
+  onUpdate?: (id: string, updatedNote: Partial<Note>) => void; // Updated signature
   className?: string;
   initialNote?: Note;
 }
@@ -81,12 +84,13 @@ const NOTE_COLORS: NoteColor[] = [
   { name: 'Gray', value: 'gray', hex: '#e8eaed' },
 ];
 
-export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTrash, className, initialNote }: TakeNotesProps) {
+export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTrash, onUpdate, className, initialNote }: TakeNotesProps) {
   const [noteState, setNoteState] = useState<NoteState>({
     isExpanded: !!initialNote,
     title: initialNote?.title || '',
     content: initialNote?.content || '',
     color: initialNote?.color || 'default',
+    labels: initialNote?.labels?.join(', ') || ''
   });
   
   const [iconState, setIconState] = useState<NoteIconState>({
@@ -110,6 +114,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
         title: initialNote.title || '',
         content: initialNote.content || '',
         color: initialNote.color || 'default',
+        labels: initialNote.labels?.join(', ') || ''
       });
       setIconState(prev => ({
         ...prev,
@@ -141,6 +146,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
         isArchived: iconState.isArchived,
         isTrash: iconState.isTrash,
         hasReminder: iconState.hasReminder,
+        labels: noteState.labels ? noteState.labels.split(',').map(label => label.trim()).filter(label => label) : []
       });
     }
     
@@ -150,6 +156,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
         title: '',
         content: '',
         color: 'default',
+        labels: ''
       });
       setIconState({
         formatBold: false,
@@ -171,6 +178,13 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     setNoteState(prev => ({ ...prev, color: color.value }));
   };
 
+  const handleUpdate = (id: string, updatedNote: Partial<Note>) => {
+    if (updatedNote.labels !== undefined) {
+      setNoteState(prev => ({ ...prev, labels: updatedNote.labels?.join(', ') || '' }));
+    }
+    onUpdate?.(id, updatedNote);
+  };
+
   const toggleIcon = (iconName: keyof NoteIconState) => {
     setIconState(prev => ({
       ...prev,
@@ -182,7 +196,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     if (noteState.isExpanded && (noteState.title?.trim() || noteState.content?.trim())) {
       handleClose();
     } else if (noteState.isExpanded && !initialNote) {
-      setNoteState(prev => ({ ...prev, isExpanded: false, color: 'default' }));
+      setNoteState(prev => ({ ...prev, isExpanded: false, color: 'default', labels: '' }));
     } else if (noteState.isExpanded && initialNote) {
       onClose?.();
     }
@@ -295,6 +309,25 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
               },
             }}
           />
+          <TextField
+            placeholder="Labels (comma-separated)"
+            value={noteState.labels || ''}
+            onChange={(e) => setNoteState(prev => ({ ...prev, labels: e.target.value }))}
+            variant="standard"
+            fullWidth
+            sx={{
+              mb: 1,
+              '& .MuiInput-underline:before': { display: 'none' },
+              '& .MuiInput-underline:hover:before': { display: 'none' },
+              '& .MuiInput-underline:after': { display: 'none' },
+              '& .MuiInput-underline:hover:not(.Mui-disabled):before': { display: 'none' },
+              '& .MuiInputBase-input': {
+                fontSize: '14px',
+                padding: '2px 0',
+                cursor: 'text',
+              },
+            }}
+          />
         </Box>
         <NoteIcons
           noteColor={noteState.color}
@@ -304,7 +337,9 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
           onPin={initialNote ? () => onPin?.(initialNote.id) : undefined}
           onArchive={initialNote ? () => onArchive?.(initialNote.id) : undefined}
           onTrash={initialNote ? () => onTrash?.(initialNote.id) : undefined}
+          // onUpdate={initialNote ? handleUpdate : undefined}
           onClose={handleClose}
+          id={initialNote?.id}
         />
       </Paper>
     </ClickAwayListener>
