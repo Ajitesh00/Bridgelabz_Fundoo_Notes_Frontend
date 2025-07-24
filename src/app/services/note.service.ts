@@ -18,7 +18,9 @@ interface Note {
   isTrash: boolean;
   hasReminder: boolean;
   reminderDateTime: Date | null;
-  labels: string[]; // Added labels field
+  labels: string[];
+  hasCollaborator: boolean; // Added
+  collaboratorEmail: string | null; // Added
 }
 
 // Define input for creating/updating notes
@@ -28,7 +30,9 @@ interface NoteInput {
   color: string;
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
-  labels?: string[]; // Added labels field
+  labels?: string[];
+  hasCollaborator?: boolean; // Added
+  collaboratorEmail?: string | null; // Added
 }
 
 // Base URL for API
@@ -50,7 +54,9 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
       isTrash: false,
       hasReminder: false,
       reminderDateTime: null,
-      labels: originalInput?.labels || [] // Default to empty array if no labels
+      labels: originalInput?.labels || [],
+      hasCollaborator: originalInput?.hasCollaborator || false, // Added
+      collaboratorEmail: originalInput?.collaboratorEmail || null, // Added
     };
   }
   console.log('Mapping backendNote:', backendNote);
@@ -66,7 +72,9 @@ const mapToFrontendNote = (backendNote: any, originalInput?: NoteInput): Note =>
     isTrash: backendNote.isTrash || false,
     hasReminder: backendNote.hasReminder || false,
     reminderDateTime: backendNote.reminderDateTime ? new Date(backendNote.reminderDateTime) : null,
-    labels: backendNote.labels || [] // Normalize NULL to []
+    labels: backendNote.labels || [],
+    hasCollaborator: backendNote.hasCollaborator || false, // Added
+    collaboratorEmail: backendNote.collaboratorEmail || null, // Added
   };
 };
 
@@ -109,7 +117,9 @@ export const createNote = async (note: NoteInput): Promise<Note> => {
       color: note.color,
       hasReminder: note.hasReminder || false,
       reminderDateTime: note.hasReminder ? note.reminderDateTime || null : null,
-      labels: note.labels || null // Include labels
+      hasCollaborator: note.hasCollaborator || false, // Added
+      collaboratorEmail: note.hasCollaborator ? note.collaboratorEmail || null : null, // Added
+      labels: note.labels || null
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     });
@@ -129,7 +139,9 @@ export const updateNote = async (id: string, note: Partial<NoteInput>): Promise<
       title: note.title,
       description: note.content,
       color: note.color,
-      labels: note.labels !== undefined ? note.labels : undefined // Include labels if provided
+      labels: note.labels !== undefined ? note.labels : undefined,
+      hasCollaborator: note.hasCollaborator, // Added
+      collaboratorEmail: note.hasCollaborator ? note.collaboratorEmail || null : null // Added
     }, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
     });
@@ -213,6 +225,23 @@ export const setReminder = async (id: string, hasReminder: boolean, reminderDate
   }
 };
 
+// Set or unset a collaborator for a note by ID
+export const setCollaborator = async (id: string, hasCollaborator: boolean, collaboratorEmail: string | null): Promise<Note> => {
+  try {
+    const response = await axios.put(`${API_BASE_URL}/${id}/collaborator`, {
+      hasCollaborator,
+      collaboratorEmail
+    }, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    });
+    console.log('setCollaborator response:', JSON.stringify(response.data, null, 2));
+    return mapToFrontendNote(response.data.data);
+  } catch (error) {
+    console.error(`Failed to set/unset collaborator for note ${id}:`, error);
+    throw error;
+  }
+};
+
 // Add a label to a note by ID
 export const addLabel = async (id: string, label: string): Promise<Note> => {
   try {
@@ -232,7 +261,7 @@ export const removeLabels = async (id: string, label?: string): Promise<Note> =>
   try {
     const response = await axios.delete(`${API_BASE_URL}/${id}/labels`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      data: label ? { name: label } : {}, // Send label if provided, else empty body to clear all
+      data: label ? { name: label } : {},
     });
     console.log('removeLabels response:', JSON.stringify(response.data, null, 2));
     return mapToFrontendNote(response.data.data);

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from 'react';
-import { styled, Theme, CSSObject } from '@mui/material/styles';
+import { styled } from '@mui/material/styles';
 import AppBar, { AppBarProps as MuiAppBarProps } from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
@@ -12,11 +12,12 @@ import MenuItem from '@mui/material/MenuItem';
 import Menu from '@mui/material/Menu';
 import MenuIcon from '@mui/icons-material/Menu';
 import SearchIcon from '@mui/icons-material/Search';
-import AccountCircle from '@mui/icons-material/AccountCircle';
 import RefreshOutlined from '@mui/icons-material/RefreshOutlined';
 import ViewAgendaOutlined from '@mui/icons-material/ViewAgendaOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import AppsRounded from '@mui/icons-material/AppsRounded';
+import Avatar from '@mui/material/Avatar';
+import { blue } from '@mui/material/colors';
 
 const drawerWidth = 240;
 
@@ -92,12 +93,23 @@ const StyledAppBar = styled(AppBar, {
 interface PrimarySearchAppBarProps {
   open: boolean;
   onDrawerToggle: () => void;
-  onSearch: (query: string) => void; // Added callback for search
+  onSearch: (query: string) => void;
 }
 
 export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: PrimarySearchAppBarProps) {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [searchQuery, setSearchQuery] = React.useState<string>(''); // State for search query
+  const [searchQuery, setSearchQuery] = React.useState<string>('');
+  const [userEmail, setUserEmail] = React.useState<string>('');
+  const [userInitial, setUserInitial] = React.useState<string>('');
+
+  // Access localStorage only on client-side
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const email = localStorage.getItem('userEmail') || '';
+      setUserEmail(email);
+      setUserInitial(email ? email.charAt(0).toUpperCase() : '');
+    }
+  }, []);
 
   const isMenuOpen = Boolean(anchorEl);
 
@@ -109,11 +121,19 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: 
     setAnchorEl(null);
   };
 
-  // Handle search input changes
+  const handleLogout = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      localStorage.removeItem('userEmail');
+    }
+    setAnchorEl(null);
+    window.location.href = '/signin';
+  };
+
   const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const query = event.target.value;
     setSearchQuery(query);
-    onSearch(query); // Pass query to parent
+    onSearch(query);
   };
 
   const menuId = 'primary-search-account-menu';
@@ -121,7 +141,7 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: 
     <Menu
       anchorEl={anchorEl}
       anchorOrigin={{
-        vertical: 'top',
+        vertical: 'bottom',
         horizontal: 'right',
       }}
       id={menuId}
@@ -134,7 +154,7 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: 
       onClose={handleMenuClose}
     >
       <MenuItem onClick={handleMenuClose}>Profile</MenuItem>
-      <MenuItem onClick={handleMenuClose}>My account</MenuItem>
+      <MenuItem onClick={handleLogout}>Logout</MenuItem>
     </Menu>
   );
 
@@ -176,7 +196,7 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: 
               placeholder="Search…"
               inputProps={{ 'aria-label': 'search' }}
               value={searchQuery}
-              onChange={handleSearchChange} // Handle input changes
+              onChange={handleSearchChange}
             />
           </Search>
           <Box sx={{ flexGrow: 1 }} />
@@ -202,7 +222,9 @@ export default function PrimarySearchAppBar({ open, onDrawerToggle, onSearch }: 
             color="inherit"
             sx={{ marginLeft: 1 }}
           >
-            <AccountCircle sx={{ borderRadius: '50%', width: 32, height: 32, color: '#5f6368' }} />
+            <Avatar sx={{ bgcolor: blue[500], width: 32, height: 32, fontSize: '1rem' }}>
+              {userInitial}
+            </Avatar>
           </IconButton>
         </Toolbar>
       </StyledAppBar>

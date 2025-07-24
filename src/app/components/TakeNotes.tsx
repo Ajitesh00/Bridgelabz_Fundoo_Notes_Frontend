@@ -30,6 +30,8 @@ interface Note {
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
   labels: string[];
+  hasCollaborator?: boolean;
+  collaboratorEmail?: string | null;
 }
 
 interface NoteColor {
@@ -64,7 +66,7 @@ interface TakeNotesProps {
   onPin?: (id: string) => void;
   onArchive?: (id: string) => void;
   onTrash?: (id: string) => void;
-  onUpdate?: (id: string, updatedNote: Partial<Note>) => void; // Updated signature
+  onUpdate?: (id: string, updatedNote: Partial<Note>) => void;
   className?: string;
   initialNote?: Note;
 }
@@ -102,7 +104,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     isArchived: initialNote?.isArchived || false,
     isTrash: initialNote?.isTrash || false,
     hasReminder: initialNote?.hasReminder || false,
-    hasCollaborator: false,
+    hasCollaborator: initialNote?.hasCollaborator || false, // Updated to use initialNote
   });
 
   const contentRef = useRef<HTMLInputElement | null>(null);
@@ -121,6 +123,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
         isArchived: initialNote.isArchived || false,
         isTrash: initialNote.isTrash || false,
         hasReminder: initialNote.hasReminder || false,
+        hasCollaborator: initialNote.hasCollaborator || false, // Updated to use initialNote
       }));
     }
   }, [initialNote]);
@@ -146,7 +149,9 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
         isArchived: iconState.isArchived,
         isTrash: iconState.isTrash,
         hasReminder: iconState.hasReminder,
-        labels: noteState.labels ? noteState.labels.split(',').map(label => label.trim()).filter(label => label) : []
+        labels: noteState.labels ? noteState.labels.split(',').map(label => label.trim()).filter(label => label) : [],
+        hasCollaborator: iconState.hasCollaborator, // Added
+        collaboratorEmail: initialNote?.collaboratorEmail || null // Added
       });
     }
     
@@ -182,7 +187,11 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
     if (updatedNote.labels !== undefined) {
       setNoteState(prev => ({ ...prev, labels: updatedNote.labels?.join(', ') || '' }));
     }
-    onUpdate?.(id, updatedNote);
+    onUpdate?.(id, {
+      ...updatedNote,
+      hasCollaborator: iconState.hasCollaborator, // Preserve collaborator state
+      collaboratorEmail: initialNote?.collaboratorEmail || null // Preserve collaborator email
+    });
   };
 
   const toggleIcon = (iconName: keyof NoteIconState) => {
@@ -337,7 +346,7 @@ export default function TakeNotes({ onSaveNote, onClose, onPin, onArchive, onTra
           onPin={initialNote ? () => onPin?.(initialNote.id) : undefined}
           onArchive={initialNote ? () => onArchive?.(initialNote.id) : undefined}
           onTrash={initialNote ? () => onTrash?.(initialNote.id) : undefined}
-          // onUpdate={initialNote ? handleUpdate : undefined}
+          onUpdate={initialNote ? handleUpdate : undefined}
           onClose={handleClose}
           id={initialNote?.id}
         />

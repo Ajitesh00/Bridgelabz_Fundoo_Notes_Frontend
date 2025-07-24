@@ -14,7 +14,8 @@ import {
   TextField,
   Button,
   Chip,
-  Stack
+  Stack,
+  Avatar
 } from '@mui/material';
 import {
   Archive,
@@ -27,8 +28,9 @@ import {
   PushPin,
   PushPinOutlined,
 } from '@mui/icons-material';
+import { deepOrange } from '@mui/material/colors';
 import TakeNotes, { NoteIconState } from './TakeNotes';
-import { setReminder, addLabel, removeLabels } from '../services/note.service';
+import { setReminder, addLabel, removeLabels, setCollaborator } from '../services/note.service';
 import { format } from 'date-fns';
 import './NotesContainer.css';
 
@@ -46,6 +48,8 @@ interface Note {
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
   labels: string[];
+  hasCollaborator?: boolean; // Added
+  collaboratorEmail?: string | null; // Added
 }
 
 interface NoteColor {
@@ -106,10 +110,15 @@ const NoteCard: React.FC<NoteCardProps> = ({
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [colorMenuAnchor, setColorMenuAnchor] = useState<null | HTMLElement>(null);
   const [reminderAnchorEl, setReminderAnchorEl] = useState<null | HTMLElement>(null);
+  const [collaboratorAnchorEl, setCollaboratorAnchorEl] = useState<null | HTMLElement>(null);
   const [reminderDateTime, setReminderDateTime] = useState<Date | null>(
     note.reminderDateTime || null
   );
+  const [collaboratorEmail, setCollaboratorEmail] = useState<string | null>(
+    note.collaboratorEmail || null
+  );
   const reminderIconRef = useRef<HTMLButtonElement>(null);
+  const collaboratorIconRef = useRef<HTMLButtonElement>(null);
 
   const currentColor = NOTE_COLORS.find(color => color.value === note.color) || NOTE_COLORS[0];
 
@@ -144,6 +153,11 @@ const NoteCard: React.FC<NoteCardProps> = ({
     setReminderAnchorEl(reminderIconRef.current);
   };
 
+  const handleCollaboratorClick = (e: React.MouseEvent<HTMLElement>) => {
+    e.stopPropagation();
+    setCollaboratorAnchorEl(collaboratorIconRef.current);
+  };
+
   const handleReminderSave = async () => {
     try {
       await onSetReminder(note.id, !!reminderDateTime, reminderDateTime);
@@ -164,6 +178,38 @@ const NoteCard: React.FC<NoteCardProps> = ({
     setReminderAnchorEl(null);
   };
 
+  const handleCollaboratorSave = async () => {
+    try {
+      const updatedNote = await setCollaborator(note.id, !!collaboratorEmail, collaboratorEmail);
+      onUpdate(note.id, {
+        hasCollaborator: updatedNote.hasCollaborator,
+        collaboratorEmail: updatedNote.collaboratorEmail
+      });
+      setCollaboratorAnchorEl(null);
+    } catch (error) {
+      console.error('Failed to set collaborator:', error);
+    }
+  };
+
+  const handleCollaboratorRemove = async () => {
+    setCollaboratorEmail(null);
+    try {
+      const updatedNote = await setCollaborator(note.id, false, null);
+      onUpdate(note.id, {
+        hasCollaborator: updatedNote.hasCollaborator,
+        collaboratorEmail: updatedNote.collaboratorEmail
+      });
+      setCollaboratorAnchorEl(null);
+    } catch (error) {
+      console.error('Failed to remove collaborator:', error);
+    }
+  };
+
+  const handleCollaboratorCancel = () => {
+    setCollaboratorEmail(note.collaboratorEmail || null);
+    setCollaboratorAnchorEl(null);
+  };
+
   const handleLabelDelete = async (label: string) => {
     try {
       const updatedNote = await removeLabels(note.id, label);
@@ -176,6 +222,11 @@ const NoteCard: React.FC<NoteCardProps> = ({
   const formatReminderDate = (date: Date | null) => {
     if (!date) return '';
     return format(new Date(date), 'MMM d, yyyy h:mm a');
+  };
+
+  // Get the first letter of the collaborator email for the Avatar
+  const getCollaboratorInitial = (email: string | null) => {
+    return email ? email.charAt(0).toUpperCase() : '';
   };
 
   return (
@@ -245,7 +296,7 @@ const NoteCard: React.FC<NoteCardProps> = ({
               fontSize: '14px',
               lineHeight: '20px',
               whiteSpace: 'pre-wrap',
-              marginBottom: note.hasReminder || note.labels.length > 0 ? '18px' : '30px',
+              marginBottom: note.hasReminder || note.labels.length > 0 || note.hasCollaborator ? '18px' : '30px',
             }}
           >
             {note.content}
@@ -253,8 +304,8 @@ const NoteCard: React.FC<NoteCardProps> = ({
         )}
       </Box>
 
-      {/* Reminder and Label Chips */}
-      {(note.hasReminder || note.labels.length > 0) && (
+      {/* Reminder, Label, and Collaborator Chips/Avatar */}
+      {(note.hasReminder || note.labels.length > 0 || note.hasCollaborator) && (
         <Stack direction="row" spacing={1} sx={{ mb: 3.5, flexWrap: 'wrap', gap: 1 }}>
           {note.hasReminder && note.reminderDateTime && (
             <Chip
@@ -273,6 +324,18 @@ const NoteCard: React.FC<NoteCardProps> = ({
               onDelete={() => handleLabelDelete(label)}
             />
           ))}
+          {note.hasCollaborator && note.collaboratorEmail && (
+            <Avatar
+              sx={{
+                bgcolor: deepOrange[500],
+                width: 24,
+                height: 24,
+                fontSize: '12px'
+              }}
+            >
+              {getCollaboratorInitial(note.collaboratorEmail)}
+            </Avatar>
+          )}
         </Stack>
       )}
 
@@ -305,8 +368,15 @@ const NoteCard: React.FC<NoteCardProps> = ({
             </IconButton>
           </Tooltip>
           <Tooltip title="Collaborator">
-            <IconButton size="small" onClick={(e) => e.stopPropagation()}>
-              <PersonAddAlt fontSize="small" />
+            <IconButton
+              size="small"
+              onClick={handleCollaboratorClick}
+              ref={collaboratorIconRef}
+            >
+              <PersonAddAlt
+                fontSize="small"
+                color={note.hasCollaborator ? 'primary' : 'inherit'}
+              />
             </IconButton>
           </Tooltip>
           <Tooltip title="Background options">
@@ -440,6 +510,60 @@ const NoteCard: React.FC<NoteCardProps> = ({
                 onClick={handleReminderSave}
                 variant="contained"
                 disabled={!reminderDateTime}
+                sx={{ textTransform: 'none', fontWeight: 500 }}
+              >
+                Save
+              </Button>
+            </Box>
+          </Box>
+        </ClickAwayListener>
+      </Popper>
+
+      {/* Collaborator Popper */}
+      <Popper
+        open={Boolean(collaboratorAnchorEl)}
+        anchorEl={collaboratorAnchorEl}
+        placement="bottom-start"
+        sx={{ zIndex: 1300 }}
+      >
+        <ClickAwayListener onClickAway={handleCollaboratorCancel}>
+          <Box
+            sx={{
+              bgcolor: 'white',
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)',
+              borderRadius: '16px',
+              p: 2,
+              minWidth: '320px',
+              maxWidth: '340px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <TextField
+              label="Collaborator Email"
+              type="email"
+              value={collaboratorEmail || ''}
+              onChange={(e) => setCollaboratorEmail(e.target.value || null)}
+              fullWidth
+              variant="outlined"
+              InputLabelProps={{ shrink: true }}
+              InputProps={{ sx: { borderRadius: '8px' } }}
+              sx={{ mb: 2, width: '100%' }}
+            />
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', width: '100%', gap: 1 }}>
+              <Button
+                onClick={handleCollaboratorRemove}
+                variant="text"
+                sx={{ textTransform: 'none', fontWeight: 500, color: 'text.secondary' }}
+              >
+                Remove
+              </Button>
+              <Button
+                onClick={handleCollaboratorSave}
+                variant="contained"
+                disabled={!collaboratorEmail}
                 sx={{ textTransform: 'none', fontWeight: 500 }}
               >
                 Save

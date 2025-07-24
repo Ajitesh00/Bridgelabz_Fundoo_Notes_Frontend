@@ -44,58 +44,59 @@ export default class SigninForm extends Component<{}, State> {
 
   // Handle form submission and API call
   handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault(); // Prevent default form submission
-  const data = { email: this.state.email, password: this.state.password };
-  
-  try {
-    // Make API call to signin service
-    const response = await signin(data);
-    const { code, message, data: responseData } = response.data;
+    e.preventDefault(); // Prevent default form submission
+    const data = { email: this.state.email, password: this.state.password };
+    
+    try {
+      // Make API call to signin service
+      const response = await signin(data);
+      const { code, message, data: responseData } = response.data;
 
-    console.log(`Received response - Code: ${code}, Message: ${message}, Data:`, responseData);
+      console.log(`Received response - Code: ${code}, Message: ${message}, Data:`, responseData);
 
-    // Handle different response codes
-    switch (code) {
-      case 200: // Success
-        // Show success message to user
-        this.setState({
-          snackbarOpen: true,
-          snackbarMessage: message,
-          snackbarSeverity: 'success',
-        });
-        // Store authentication token
-        localStorage.setItem('token', responseData.token);
-        // Redirect to dashboard on successful login
-        window.location.href = '/dashboard';
-        break;
-      case 401: // Unauthorized - wrong password
-      case 404: // User not found
-      case 500: // Server error
-        // Show error message to user
-        this.setState({
-          snackbarOpen: true,
-          snackbarMessage: message,
-          snackbarSeverity: 'error',
-        });
-        break;
-      default: // Unexpected error
-        console.log('Unexpected status code:', code, responseData);
-        this.setState({
-          snackbarOpen: true,
-          snackbarMessage: 'Unexpected error occurred. Please try again.',
-          snackbarSeverity: 'error',
-        });
+      // Handle different response codes
+      switch (code) {
+        case 200: // Success
+          // Show success message to user
+          this.setState({
+            snackbarOpen: true,
+            snackbarMessage: message,
+            snackbarSeverity: 'success',
+          });
+          // Store authentication token and email
+          localStorage.setItem('token', responseData.token);
+          localStorage.setItem('userEmail', data.email); // Store email
+          // Redirect to dashboard on successful login
+          window.location.href = '/dashboard';
+          break;
+        case 401: // Unauthorized - wrong password
+        case 404: // User not found
+        case 500: // Server error
+          // Show error message to user
+          this.setState({
+            snackbarOpen: true,
+            snackbarMessage: message,
+            snackbarSeverity: 'error',
+          });
+          break;
+        default: // Unexpected error
+          console.log('Unexpected status code:', code, responseData);
+          this.setState({
+            snackbarOpen: true,
+            snackbarMessage: 'Unexpected error occurred. Please try again.',
+            snackbarSeverity: 'error',
+          });
+      }
+    } catch (error: any) {
+      // Handle network errors or API failures
+      console.error('API call failed:', error.response ? error.response.data : error.message);
+      this.setState({
+        snackbarOpen: true,
+        snackbarMessage: 'Network error or server unreachable. Please try again.',
+        snackbarSeverity: 'error',
+      });
     }
-  } catch (error: any) {
-    // Handle network errors or API failures
-    console.error('API call failed:', error.response ? error.response.data : error.message);
-    this.setState({
-      snackbarOpen: true,
-      snackbarMessage: 'Network error or server unreachable. Please try again.',
-      snackbarSeverity: 'error',
-    });
-  }
-};
+  };
 
   // Close notification snackbar
   handleSnackbarClose = () => {

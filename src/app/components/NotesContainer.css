@@ -1,3 +1,3 @@
 .css-1e9vdkb-MuiStack-root>:not(style)~:not(style) {
-    margin-left: 0px;
+    margin-left: 0px !important;
 }

@@ -25,6 +25,8 @@ interface Note {
   hasReminder?: boolean;
   reminderDateTime?: Date | null;
   labels: string[];
+  hasCollaborator?: boolean; // Added
+  collaboratorEmail?: string | null; // Added
 }
 
 const drawerWidth = 240;
@@ -125,7 +127,9 @@ export default function Dashboard() {
         title: updatedNote.title,
         content: updatedNote.content,
         color: updatedNote.color,
-        labels: updatedNote.labels
+        labels: updatedNote.labels,
+        hasCollaborator: updatedNote.hasCollaborator, // Added
+        collaboratorEmail: updatedNote.hasCollaborator ? updatedNote.collaboratorEmail || null : null // Added
       });
       setNotes(prev =>
         prev.map(note =>
